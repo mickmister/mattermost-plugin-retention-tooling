@@ -35,7 +35,7 @@ func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Req
 		p.handleRemoveUserFromAllTeamsAndChannels(w, r)
 		return
 	default:
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusNotFound)
 		_ = json.NewEncoder(w).Encode(ErrorResponse{
 			fmt.Sprintf("no handler for route %s", r.URL.Path),
 		})

@@ -27,7 +27,7 @@ func TestServeHTTP(t *testing.T) {
 				r := httptest.NewRequest(http.MethodGet, "/", nil)
 				return r
 			},
-			expectedStatus: 400,
+			expectedStatus: 404,
 			expectedError:  "no handler for route /",
 		},
 		"invalid path": {
@@ -35,7 +35,7 @@ func TestServeHTTP(t *testing.T) {
 				r := httptest.NewRequest(http.MethodGet, "/invalid", nil)
 				return r
 			},
-			expectedStatus: 400,
+			expectedStatus: 404,
 			expectedError:  "no handler for route /invalid",
 		},
 		"valid path, invalid http method": {
