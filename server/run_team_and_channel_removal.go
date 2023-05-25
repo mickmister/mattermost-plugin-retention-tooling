@@ -11,14 +11,14 @@ import (
 )
 
 type Payload struct {
-	UserId   string `json:"user_id"`
+	UserID   string `json:"user_id"`
 	Username string `json:"username"`
 }
 
 func (p *Plugin) handleRemoveUserFromAllTeamsAndChannels(w http.ResponseWriter, r *http.Request) {
 	var writeError = func(errorString string, statusCode int) {
 		w.WriteHeader(statusCode)
-		json.NewEncoder(w).Encode(ErrorResponse{errorString})
+		_ = json.NewEncoder(w).Encode(ErrorResponse{errorString})
 	}
 
 	if r.Method != http.MethodPost {
@@ -26,29 +26,29 @@ func (p *Plugin) handleRemoveUserFromAllTeamsAndChannels(w http.ResponseWriter, 
 		return
 	}
 
-	requesterId := r.Header.Get("Mattermost-User-Id")
-	if requesterId == "" {
+	requesterID := r.Header.Get("Mattermost-User-Id")
+	if requesterID == "" {
 		writeError("request is not from an authenticated user", http.StatusUnauthorized)
 		return
 	}
 
-	err := p.ensureSystemAdmin(requesterId)
+	err := p.ensureSystemAdmin(requesterID)
 	if err != nil {
-		writeError(fmt.Sprintf("error verifying whether user %s is a system admin: %s", requesterId, err.Error()), http.StatusUnauthorized)
+		writeError(fmt.Sprintf("error verifying whether user %s is a system admin: %s", requesterID, err.Error()), http.StatusUnauthorized)
 		return
 	}
 
-	err = p.removeUserFromAllTeamsAndChannels(r, requesterId)
+	err = p.removeUserFromAllTeamsAndChannels(r, requesterID)
 	if err != nil {
 		writeError(fmt.Sprintf("error processing request: %s", err.Error()), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(SuccessResponse{true})
+	_ = json.NewEncoder(w).Encode(SuccessResponse{true})
 }
 
-func (p *Plugin) removeUserFromAllTeamsAndChannels(r *http.Request, requesterId string) error {
+func (p *Plugin) removeUserFromAllTeamsAndChannels(r *http.Request, requesterID string) error {
 	var payload Payload
 	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
@@ -60,17 +60,18 @@ func (p *Plugin) removeUserFromAllTeamsAndChannels(r *http.Request, requesterId 
 	var appErr *model.AppError
 
 	// Get user from info supplied in request payload
-	if payload.UserId != "" {
-		user, appErr = p.API.GetUser(payload.UserId)
+	switch {
+	case payload.UserID != "":
+		user, appErr = p.API.GetUser(payload.UserID)
 		if appErr != nil {
-			return errors.Wrapf(appErr, "failed to get user with id %s", payload.UserId)
+			return errors.Wrapf(appErr, "failed to get user with id %s", payload.UserID)
 		}
-	} else if payload.Username != "" {
+	case payload.Username != "":
 		user, appErr = p.API.GetUserByUsername(payload.Username)
 		if appErr != nil {
 			return errors.Wrapf(appErr, "failed to get user with username %s", payload.Username)
 		}
-	} else {
+	default:
 		return errors.New("please provide either user_id or username in the request payload")
 	}
 
@@ -81,7 +82,7 @@ func (p *Plugin) removeUserFromAllTeamsAndChannels(r *http.Request, requesterId 
 	}
 
 	for _, tm := range teamMembers {
-		err = p.processTeamMember(user, tm.TeamId, requesterId)
+		err = p.processTeamMember(user, tm.TeamId, requesterID)
 		if err != nil {
 			return errors.Wrapf(err, "failed to process team member. user=%s team=%s", user.Username, tm.TeamId)
 		}
@@ -92,11 +93,11 @@ func (p *Plugin) removeUserFromAllTeamsAndChannels(r *http.Request, requesterId 
 	return nil
 }
 
-func (p *Plugin) processTeamMember(user *model.User, teamId string, requesterId string) error {
+func (p *Plugin) processTeamMember(user *model.User, teamID string, requesterID string) error {
 	var appErr *model.AppError
 
 	// Remove user from channels in this team
-	channelMembers, appErr := p.API.GetChannelMembersForUser(user.Id, teamId, 0, 1000)
+	channelMembers, appErr := p.API.GetChannelMembersForUser(user.Id, teamID, 0, 1000)
 	if appErr != nil {
 		return errors.Wrapf(appErr, "failed to get channel members")
 	}
@@ -109,23 +110,23 @@ func (p *Plugin) processTeamMember(user *model.User, teamId string, requesterId 
 	}
 
 	// Remove user from team
-	appErr = p.API.DeleteTeamMember(teamId, user.Id, requesterId)
+	appErr = p.API.DeleteTeamMember(teamID, user.Id, requesterID)
 	if appErr != nil {
 		return errors.Wrap(appErr, "failed to remove user from team")
 	}
 
-	p.API.LogDebug("Removed user from all channels in team. user=%s team=%s", user.Username, teamId)
+	p.API.LogDebug("Removed user from all channels in team. user=%s team=%s", user.Username, teamID)
 
 	return nil
 }
 
-func (p *Plugin) processChannelMember(user *model.User, channelId string) error {
+func (p *Plugin) processChannelMember(user *model.User, channelID string) error {
 	// Remove user from channel
-	appErr := p.API.DeleteChannelMember(channelId, user.Id)
+	appErr := p.API.DeleteChannelMember(channelID, user.Id)
 	if appErr != nil {
-		c, channelErr := p.API.GetChannel(channelId)
+		c, channelErr := p.API.GetChannel(channelID)
 		if channelErr != nil {
-			return errors.Wrapf(channelErr, "failed to get channel %s", channelId)
+			return errors.Wrapf(channelErr, "failed to get channel %s", channelID)
 		}
 
 		if c.Name == model.DEFAULT_CHANNEL {
