@@ -88,7 +88,7 @@ func (p *Plugin) removeUserFromAllTeamsAndChannels(r *http.Request, requesterID 
 		}
 	}
 
-	p.API.LogDebug("Finished for user. user=%s", user.Username)
+	p.API.LogDebug("Finished for user.", "username", user.Username)
 
 	return nil
 }
@@ -115,7 +115,7 @@ func (p *Plugin) processTeamMember(user *model.User, teamID string, requesterID 
 		return errors.Wrap(appErr, "failed to remove user from team")
 	}
 
-	p.API.LogDebug("Removed user from all channels in team. user=%s team=%s", user.Username, teamID)
+	p.API.LogDebug("Removed user from all channels in team.", "username", user.Username, "team", teamID)
 
 	return nil
 }
