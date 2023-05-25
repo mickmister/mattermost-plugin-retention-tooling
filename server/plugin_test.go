@@ -89,6 +89,8 @@ func TestServeHTTP(t *testing.T) {
 					Roles: "system_user system_admin",
 				}, nil)
 
+				api.On("LogError", "error processing request: error decoding user info payload: EOF")
+
 				return r
 			},
 			expectedStatus: 500,
