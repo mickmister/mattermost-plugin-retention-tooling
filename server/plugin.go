@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	routeRemoveUserFromAllTeamsAndChannels = "remove_user_from_all_teams_and_channels"
+	routeRemoveUserFromAllTeamsAndChannels = "/remove_user_from_all_teams_and_channels"
 )
 
 type ErrorResponse struct {
