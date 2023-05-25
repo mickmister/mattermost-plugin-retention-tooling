@@ -124,7 +124,7 @@ func TestServeHTTP(t *testing.T) {
 		"username provided in request": {
 			makeRequest: func(api *plugintest.API) *http.Request {
 				payload := Payload{
-					Username: "deactivated_username",
+					UserID: "deactivated_user_id",
 				}
 				b, _ := json.Marshal(payload)
 
@@ -135,7 +135,7 @@ func TestServeHTTP(t *testing.T) {
 					Roles: "system_user system_admin",
 				}, nil)
 
-				api.On("GetUserByUsername", "deactivated_username").Return(&model.User{
+				api.On("GetUser", "deactivated_user_id").Return(&model.User{
 					Id:       "deactivated_user_id",
 					Username: "deactivated_username",
 				}, nil)
@@ -182,30 +182,12 @@ func TestServeHTTP(t *testing.T) {
 
 func TestHandleRemoveUserFromAllTeamsAndChannels(t *testing.T) {
 	for name, tc := range map[string]struct {
-		makeRequest    func(api *plugintest.API) *http.Request
+		runAssertions  func(api *plugintest.API)
 		expectedStatus int
 		expectedError  string
 	}{
-
 		"happy path, user is member of one team": {
-			makeRequest: func(api *plugintest.API) *http.Request {
-				payload := Payload{
-					Username: "deactivated_username",
-				}
-				b, _ := json.Marshal(payload)
-
-				r := httptest.NewRequest(http.MethodPost, deleteChannelMembersRoute, bytes.NewReader(b))
-				r.Header.Set("Mattermost-User-Id", "requesting_user_id")
-
-				api.On("GetUser", "requesting_user_id").Return(&model.User{
-					Roles: "system_user system_admin",
-				}, nil)
-
-				api.On("GetUserByUsername", "deactivated_username").Return(&model.User{
-					Id:       "deactivated_user_id",
-					Username: "deactivated_username",
-				}, nil)
-
+			runAssertions: func(api *plugintest.API) {
 				api.On("GetTeamMembersForUser", "deactivated_user_id", 0, 1000).Return([]*model.TeamMember{{
 					TeamId: "teamid1",
 					UserId: "deactivated_user_id",
@@ -234,30 +216,12 @@ func TestHandleRemoveUserFromAllTeamsAndChannels(t *testing.T) {
 
 				api.On("LogDebug", "Removed user from all channels in team.", "username", "deactivated_username", "team", "teamid1")
 				api.On("LogDebug", "Finished for user.", "username", "deactivated_username")
-				return r
 			},
 			expectedStatus: 200,
 			expectedError:  "",
 		},
 		"happy path, user is member of two teams": {
-			makeRequest: func(api *plugintest.API) *http.Request {
-				payload := Payload{
-					Username: "deactivated_username",
-				}
-				b, _ := json.Marshal(payload)
-
-				r := httptest.NewRequest(http.MethodPost, deleteChannelMembersRoute, bytes.NewReader(b))
-				r.Header.Set("Mattermost-User-Id", "requesting_user_id")
-
-				api.On("GetUser", "requesting_user_id").Return(&model.User{
-					Roles: "system_user system_admin",
-				}, nil)
-
-				api.On("GetUserByUsername", "deactivated_username").Return(&model.User{
-					Id:       "deactivated_user_id",
-					Username: "deactivated_username",
-				}, nil)
-
+			runAssertions: func(api *plugintest.API) {
 				api.On("GetTeamMembersForUser", "deactivated_user_id", 0, 1000).Return([]*model.TeamMember{
 					{
 						TeamId: "teamid1",
@@ -311,30 +275,12 @@ func TestHandleRemoveUserFromAllTeamsAndChannels(t *testing.T) {
 				api.On("LogDebug", "Removed user from all channels in team.", "username", "deactivated_username", "team", "teamid1")
 				api.On("LogDebug", "Removed user from all channels in team.", "username", "deactivated_username", "team", "teamid2")
 				api.On("LogDebug", "Finished for user.", "username", "deactivated_username")
-				return r
 			},
 			expectedStatus: 200,
 			expectedError:  "",
 		},
 		"error deleting team member": {
-			makeRequest: func(api *plugintest.API) *http.Request {
-				payload := Payload{
-					Username: "deactivated_username",
-				}
-				b, _ := json.Marshal(payload)
-
-				r := httptest.NewRequest(http.MethodPost, deleteChannelMembersRoute, bytes.NewReader(b))
-				r.Header.Set("Mattermost-User-Id", "requesting_user_id")
-
-				api.On("GetUser", "requesting_user_id").Return(&model.User{
-					Roles: "system_user system_admin",
-				}, nil)
-
-				api.On("GetUserByUsername", "deactivated_username").Return(&model.User{
-					Id:       "deactivated_user_id",
-					Username: "deactivated_username",
-				}, nil)
-
+			runAssertions: func(api *plugintest.API) {
 				api.On("GetTeamMembersForUser", "deactivated_user_id", 0, 1000).Return([]*model.TeamMember{
 					{
 						TeamId: "teamid1",
@@ -363,13 +309,83 @@ func TestHandleRemoveUserFromAllTeamsAndChannels(t *testing.T) {
 
 				api.On("DeleteTeamMember", "teamid1", "deactivated_user_id", "requesting_user_id").Return(&model.AppError{DetailedError: "some database error"})
 
-				api.On("LogDebug", "Removed user from all channels in team.", "username", "deactivated_username", "team", "teamid1")
-				api.On("LogDebug", "Removed user from all channels in team.", "username", "deactivated_username", "team", "teamid2")
-				api.On("LogDebug", "Finished for user.", "username", "deactivated_username")
-				return r
+				api.On("LogError", "error processing request: failed to process team member. user=deactivated_username team=teamid1: failed to remove user from team: : , some database error")
 			},
 			expectedStatus: 500,
 			expectedError:  "error processing request: failed to process team member. user=deactivated_username team=teamid1: failed to remove user from team: : , some database error",
+		},
+		"error deleting channel member": {
+			runAssertions: func(api *plugintest.API) {
+				api.On("GetTeamMembersForUser", "deactivated_user_id", 0, 1000).Return([]*model.TeamMember{
+					{
+						TeamId: "teamid1",
+						UserId: "deactivated_user_id",
+					},
+				}, nil)
+
+				api.On("GetChannelMembersForUser", "deactivated_user_id", "teamid1", 0, 1000).Return([]*model.ChannelMember{
+					{
+						ChannelId: "channelid1",
+						UserId:    "deactivated_user_id",
+					},
+					{
+						ChannelId: "channelid2",
+						UserId:    "deactivated_user_id",
+					},
+					{
+						ChannelId: "channelid3",
+						UserId:    "deactivated_user_id",
+					},
+				}, nil)
+
+				api.On("DeleteChannelMember", "channelid1", "deactivated_user_id").Return(nil)
+				api.On("DeleteChannelMember", "channelid2", "deactivated_user_id").Return(nil)
+				api.On("DeleteChannelMember", "channelid3", "deactivated_user_id").Return(&model.AppError{DetailedError: "some database error"})
+
+				api.On("GetChannel", "channelid3").Return(&model.Channel{Name: "channelname3"}, nil)
+
+				api.On("LogError", "error processing request: failed to process team member. user=deactivated_username team=teamid1: failed to process channel member. channel=channelid3: failed to remove user from channel: : , some database error")
+			},
+			expectedStatus: 500,
+			expectedError:  "error processing request: failed to process team member. user=deactivated_username team=teamid1: failed to process channel member. channel=channelid3: failed to remove user from channel: : , some database error",
+		},
+		"handle town square case": {
+			runAssertions: func(api *plugintest.API) {
+				api.On("GetTeamMembersForUser", "deactivated_user_id", 0, 1000).Return([]*model.TeamMember{
+					{
+						TeamId: "teamid1",
+						UserId: "deactivated_user_id",
+					},
+				}, nil)
+
+				api.On("GetChannelMembersForUser", "deactivated_user_id", "teamid1", 0, 1000).Return([]*model.ChannelMember{
+					{
+						ChannelId: "channelid1",
+						UserId:    "deactivated_user_id",
+					},
+					{
+						ChannelId: "channelid2",
+						UserId:    "deactivated_user_id",
+					},
+					{
+						ChannelId: "channelid3",
+						UserId:    "deactivated_user_id",
+					},
+				}, nil)
+
+				api.On("DeleteChannelMember", "channelid1", "deactivated_user_id").Return(nil)
+				api.On("DeleteChannelMember", "channelid2", "deactivated_user_id").Return(nil)
+				api.On("DeleteChannelMember", "channelid3", "deactivated_user_id").Return(&model.AppError{DetailedError: "some database error"})
+
+				api.On("GetChannel", "channelid3").Return(&model.Channel{Name: "town-square"}, nil)
+
+				api.On("DeleteTeamMember", "teamid1", "deactivated_user_id", "requesting_user_id").Return(nil)
+
+				api.On("LogDebug", "Removed user from all channels in team.", "username", "deactivated_username", "team", "teamid1")
+				api.On("LogDebug", "Finished for user.", "username", "deactivated_username")
+			},
+			expectedStatus: 200,
+			expectedError:  "",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -378,7 +394,25 @@ func TestHandleRemoveUserFromAllTeamsAndChannels(t *testing.T) {
 			p.SetAPI(api)
 
 			w := httptest.NewRecorder()
-			r := tc.makeRequest(api)
+
+			payload := Payload{
+				Username: "deactivated_username",
+			}
+			b, _ := json.Marshal(payload)
+
+			r := httptest.NewRequest(http.MethodPost, deleteChannelMembersRoute, bytes.NewReader(b))
+			r.Header.Set("Mattermost-User-Id", "requesting_user_id")
+
+			api.On("GetUser", "requesting_user_id").Return(&model.User{
+				Roles: "system_user system_admin",
+			}, nil)
+
+			api.On("GetUserByUsername", "deactivated_username").Return(&model.User{
+				Id:       "deactivated_user_id",
+				Username: "deactivated_username",
+			}, nil)
+
+			tc.runAssertions(api)
 
 			p.ServeHTTP(nil, w, r)
 

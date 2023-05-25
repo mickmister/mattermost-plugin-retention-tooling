@@ -40,7 +40,9 @@ func (p *Plugin) handleRemoveUserFromAllTeamsAndChannels(w http.ResponseWriter, 
 
 	err = p.removeUserFromAllTeamsAndChannels(r, requesterID)
 	if err != nil {
-		writeError(fmt.Sprintf("error processing request: %s", err.Error()), http.StatusInternalServerError)
+		err = errors.Wrap(err, "error processing request")
+		p.API.LogError(err.Error())
+		writeError(err.Error(), http.StatusInternalServerError)
 		return
 	}
 
