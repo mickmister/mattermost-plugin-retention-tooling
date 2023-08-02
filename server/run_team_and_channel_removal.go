@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/mattermost/mattermost-server/v5/model"
+	"github.com/mattermost/mattermost-server/v6/model"
 )
 
 type Payload struct {
@@ -131,7 +131,7 @@ func (p *Plugin) processChannelMember(user *model.User, channelID string) error 
 			return errors.Wrapf(channelErr, "failed to get channel %s", channelID)
 		}
 
-		if c.Name == model.DEFAULT_CHANNEL {
+		if c.Name == model.DefaultChannelName {
 			return nil
 		}
 
