@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"sync"
 
-	papi "github.com/mattermost/mattermost-plugin-api"
+	pluginapi "github.com/mattermost/mattermost-plugin-api"
+	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/store"
 	"github.com/mattermost/mattermost-server/v6/plugin"
 )
 
@@ -27,7 +28,8 @@ type Plugin struct {
 	configurationLock sync.RWMutex
 	configuration     *configuration
 
-	papiClient *papi.Client
+	Client   *pluginapi.Client
+	SQLStore *store.SQLStore
 }
 
 func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
@@ -46,7 +48,13 @@ func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Req
 }
 
 func (p *Plugin) OnActivate() error {
-	p.papiClient = papi.NewClient(p.API, p.Driver)
+	p.Client = pluginapi.NewClient(p.API, p.Driver)
+	SQLStore, err := store.New(p.Client)
+	if err != nil {
+		p.Client.Log.Error("cannot create SQLStore", "err", err)
+		return err
+	}
+	p.SQLStore = SQLStore
 
 	// not implemented yet
 	return nil
