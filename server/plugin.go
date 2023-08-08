@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/mattermost/mattermost-server/v5/plugin"
+	pluginapi "github.com/mattermost/mattermost-plugin-api"
+	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/store"
+	"github.com/mattermost/mattermost-server/v6/plugin"
 )
 
 const (
@@ -25,6 +27,9 @@ type Plugin struct {
 	plugin.MattermostPlugin
 	configurationLock sync.RWMutex
 	configuration     *configuration
+
+	Client   *pluginapi.Client
+	SQLStore *store.SQLStore
 }
 
 func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
@@ -40,4 +45,22 @@ func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Req
 			fmt.Sprintf("no handler for route %s", r.URL.Path),
 		})
 	}
+}
+
+func (p *Plugin) OnActivate() error {
+	p.Client = pluginapi.NewClient(p.API, p.Driver)
+	SQLStore, err := store.New(p.Client)
+	if err != nil {
+		p.Client.Log.Error("cannot create SQLStore", "err", err)
+		return err
+	}
+	p.SQLStore = SQLStore
+
+	// not implemented yet
+	return nil
+}
+
+func (p *Plugin) OnDeactivate() error {
+	// not implemented yet
+	return nil
 }

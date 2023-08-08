@@ -5,7 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/mattermost/mattermost-server/v5/model"
+	"github.com/mattermost/mattermost-server/v6/model"
 )
 
 func (p *Plugin) ensureSystemAdmin(userID string) error {
@@ -14,7 +14,7 @@ func (p *Plugin) ensureSystemAdmin(userID string) error {
 		return errors.Wrapf(appErr, "failed to get user with id %s", userID)
 	}
 
-	if !strings.Contains(user.Roles, model.SYSTEM_ADMIN_ROLE_ID) {
+	if !strings.Contains(user.Roles, model.SystemAdminRoleId) {
 		return errors.New("user is not a system admin")
 	}
 
