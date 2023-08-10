@@ -2,6 +2,7 @@ package store
 
 import (
 	sq "github.com/Masterminds/squirrel"
+
 	"github.com/mattermost/mattermost-server/v6/model"
 )
 

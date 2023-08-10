@@ -14,7 +14,7 @@ type Reason string
 
 const (
 	ReasonDone      Reason = "completed normally"
-	ReasonCancelled Reason = "cancelled"
+	ReasonCancelled Reason = "canceled"
 	ReasonTimeout   Reason = "timed out"
 	ReasonError     Reason = "error"
 )
@@ -34,7 +34,7 @@ type ArchiverResults struct {
 	start            time.Time
 }
 
-func ArchiveChannels(db *sql.DB, opts ArchiverOpts, ctx context.Context) (results *ArchiverResults, retErr error) {
+func ArchiveChannels(ctx context.Context, db *sql.DB, opts ArchiverOpts) (results *ArchiverResults, retErr error) {
 	results = &ArchiverResults{
 		ExitReason: ReasonDone,
 		Warnings:   merror.New(),
@@ -51,9 +51,14 @@ func ArchiveChannels(db *sql.DB, opts ArchiverOpts, ctx context.Context) (result
 		results.Duration = time.Since(results.start)
 	}()
 
-	return results, archiveChannels(db, opts, results, ctx)
+	return results, archiveChannels(ctx, db, opts, results)
 }
 
-func archiveChannels(db *sql.DB, opts ArchiverOpts, results *ArchiverResults, ctx context.Context) error {
+func archiveChannels(ctx context.Context, db *sql.DB, opts ArchiverOpts, results *ArchiverResults) error {
+	_ = ctx
+	_ = db
+	_ = opts
+	_ = results
+
 	return errors.New("not implemented yet")
 }
