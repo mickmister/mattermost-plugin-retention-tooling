@@ -18,8 +18,10 @@ type TestHelper struct {
 
 	Store *SQLStore
 
-	Team1 *model.Team
-	Team2 *model.Team
+	Team1    *model.Team
+	Team2    *model.Team
+	Channel1 *model.Channel
+	Channel2 *model.Channel
 }
 
 func SetupHelper(t *testing.T) *TestHelper {
@@ -48,6 +50,12 @@ func (th *TestHelper) SetupBasic(t *testing.T) *TestHelper {
 	require.NoError(t, err, "could not create teams")
 	th.Team1 = teams[0]
 	th.Team2 = teams[1]
+
+	// create some channels
+	channels, err := th.createChannels(2, "test-team")
+	require.NoError(t, err, "could not create channels")
+	th.Channel1 = channels[0]
+	th.Channel2 = channels[1]
 
 	return th
 }
@@ -78,7 +86,24 @@ func (th *TestHelper) createTeams(num int, namePrefix string) ([]*model.Team, er
 	return teams, nil
 }
 
-// storeWrapper is a wrapper for MainHelper that implemenbts SQLStoreSource interface.
+func (th *TestHelper) createChannels(num int, namePrefix string) ([]*model.Channel, error) {
+	var channels []*model.Channel
+	for i := 0; i < num; i++ {
+		channel := &model.Channel{
+			Name:        fmt.Sprintf("%s-%d", namePrefix, i),
+			DisplayName: fmt.Sprintf("%s-%d", namePrefix, i),
+			Type:        model.ChannelTypeOpen,
+		}
+		channel, err := th.mainHelper.Store.Channel().Save(channel, 1024)
+		if err != nil {
+			return nil, err
+		}
+		channels = append(channels, channel)
+	}
+	return channels, nil
+}
+
+// storeWrapper is a wrapper for MainHelper that implements SQLStoreSource interface.
 type storeWrapper struct {
 	mainHelper *testlib.MainHelper
 }
