@@ -46,6 +46,8 @@ func New(src SQLStoreSource, logger Logger) (*SQLStore, error) {
 		db.MapperFunc(func(s string) string { return s })
 	}
 
+	builder = builder.RunWith(db)
+
 	return &SQLStore{
 		db,
 		builder,

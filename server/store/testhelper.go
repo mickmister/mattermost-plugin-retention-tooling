@@ -22,6 +22,8 @@ type TestHelper struct {
 	Team2    *model.Team
 	Channel1 *model.Channel
 	Channel2 *model.Channel
+	User1    *model.User
+	User2    *model.User
 }
 
 func SetupHelper(t *testing.T) *TestHelper {
@@ -46,13 +48,19 @@ func SetupHelper(t *testing.T) *TestHelper {
 
 func (th *TestHelper) SetupBasic(t *testing.T) *TestHelper {
 	// create some teams
-	teams, err := th.createTeams(2, "test-team")
+	teams, err := th.CreateTeams(2, "test-team")
 	require.NoError(t, err, "could not create teams")
 	th.Team1 = teams[0]
 	th.Team2 = teams[1]
 
+	// create some users
+	users, err := th.CreateUsers(2, "test.user")
+	require.NoError(t, err)
+	th.User1 = users[0]
+	th.User2 = users[1]
+
 	// create some channels
-	channels, err := th.createChannels(2, "test-team")
+	channels, err := th.CreateChannels(2, "test-channel", th.User1.Id, th.Team1.Id)
 	require.NoError(t, err, "could not create channels")
 	th.Channel1 = channels[0]
 	th.Channel2 = channels[1]
@@ -60,7 +68,7 @@ func (th *TestHelper) SetupBasic(t *testing.T) *TestHelper {
 	return th
 }
 
-func (th *TestHelper) tearDown() {
+func (th *TestHelper) TearDown() {
 	if th.mainHelper.SQLStore != nil {
 		th.mainHelper.SQLStore.Close()
 	}
@@ -69,7 +77,7 @@ func (th *TestHelper) tearDown() {
 	}
 }
 
-func (th *TestHelper) createTeams(num int, namePrefix string) ([]*model.Team, error) {
+func (th *TestHelper) CreateTeams(num int, namePrefix string) ([]*model.Team, error) {
 	var teams []*model.Team
 	for i := 0; i < num; i++ {
 		team := &model.Team{
@@ -86,13 +94,15 @@ func (th *TestHelper) createTeams(num int, namePrefix string) ([]*model.Team, er
 	return teams, nil
 }
 
-func (th *TestHelper) createChannels(num int, namePrefix string) ([]*model.Channel, error) {
+func (th *TestHelper) CreateChannels(num int, namePrefix string, userID string, teamID string) ([]*model.Channel, error) {
 	var channels []*model.Channel
 	for i := 0; i < num; i++ {
 		channel := &model.Channel{
 			Name:        fmt.Sprintf("%s-%d", namePrefix, i),
 			DisplayName: fmt.Sprintf("%s-%d", namePrefix, i),
 			Type:        model.ChannelTypeOpen,
+			CreatorId:   userID,
+			TeamId:      teamID,
 		}
 		channel, err := th.mainHelper.Store.Channel().Save(channel, 1024)
 		if err != nil {
@@ -101,6 +111,59 @@ func (th *TestHelper) createChannels(num int, namePrefix string) ([]*model.Chann
 		channels = append(channels, channel)
 	}
 	return channels, nil
+}
+
+func (th *TestHelper) CreateUsers(num int, namePrefix string) ([]*model.User, error) {
+	var users []*model.User
+	for i := 0; i < num; i++ {
+		user := &model.User{
+			Username: fmt.Sprintf("%s-%d", namePrefix, i),
+			Password: namePrefix,
+			Email:    fmt.Sprintf("%s@example.com", model.NewId()),
+		}
+		user, err := th.mainHelper.Store.User().Save(user)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
+func (th *TestHelper) CreatePosts(num int, userID string, channelID string) ([]*model.Post, error) {
+	var posts []*model.Post
+	for i := 0; i < num; i++ {
+		post := &model.Post{
+			UserId:    userID,
+			ChannelId: channelID,
+			Type:      model.PostTypeDefault,
+			Message:   fmt.Sprintf("test post %d of %d", i, num),
+		}
+		post, err := th.mainHelper.Store.Post().Save(post)
+		if err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+	return posts, nil
+}
+
+func (th *TestHelper) CreateReactions(posts []*model.Post, userID string) ([]*model.Reaction, error) {
+	var reactions []*model.Reaction
+	for _, post := range posts {
+		reaction := &model.Reaction{
+			PostId:    post.Id,
+			UserId:    userID,
+			EmojiName: "shrug",
+			ChannelId: post.ChannelId,
+		}
+		reaction, err := th.mainHelper.Store.Reaction().Save(reaction)
+		if err != nil {
+			return nil, err
+		}
+		reactions = append(reactions, reaction)
+	}
+	return reactions, nil
 }
 
 // storeWrapper is a wrapper for MainHelper that implements SQLStoreSource interface.
