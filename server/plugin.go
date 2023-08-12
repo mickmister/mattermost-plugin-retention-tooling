@@ -32,7 +32,7 @@ type Plugin struct {
 	SQLStore *store.SQLStore
 }
 
-func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
+func (p *Plugin) ServeHTTP(_ *plugin.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	switch r.URL.Path {
@@ -49,14 +49,13 @@ func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Req
 
 func (p *Plugin) OnActivate() error {
 	p.Client = pluginapi.NewClient(p.API, p.Driver)
-	SQLStore, err := store.New(p.Client)
+	SQLStore, err := store.New(p.Client.Store, &p.Client.Log)
 	if err != nil {
 		p.Client.Log.Error("cannot create SQLStore", "err", err)
 		return err
 	}
 	p.SQLStore = SQLStore
 
-	// not implemented yet
 	return nil
 }
 

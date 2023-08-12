@@ -1,40 +1,56 @@
 package store
 
 import (
+	"database/sql"
+
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
-	pluginapi "github.com/mattermost/mattermost-plugin-api"
+
 	"github.com/mattermost/mattermost-server/v6/model"
 )
+
+type SQLStoreSource interface {
+	GetMasterDB() (*sql.DB, error)
+	DriverName() string
+}
+
+type Logger interface {
+	Error(message string, keyValuePairs ...interface{})
+	Warn(message string, keyValuePairs ...interface{})
+	Info(message string, keyValuePairs ...interface{})
+	Debug(message string, keyValuePairs ...interface{})
+}
 
 type SQLStore struct {
 	db      *sqlx.DB
 	builder sq.StatementBuilderType
-	logger  pluginapi.LogService
+	logger  Logger
 }
 
 // New constructs a new instance of SQLStore.
-func New(client *pluginapi.Client) (*SQLStore, error) {
+func New(src SQLStoreSource, logger Logger) (*SQLStore, error) {
 	var db *sqlx.DB
 
-	origDB, err := client.Store.GetMasterDB()
+	origDB, err := src.GetMasterDB()
 	if err != nil {
 		return nil, err
 	}
-	db = sqlx.NewDb(origDB, client.Store.DriverName())
+	db = sqlx.NewDb(origDB, src.DriverName())
 
 	builder := sq.StatementBuilder.PlaceholderFormat(sq.Question)
-	if client.Store.DriverName() == model.DatabaseDriverPostgres {
+	if src.DriverName() == model.DatabaseDriverPostgres {
 		builder = builder.PlaceholderFormat(sq.Dollar)
 	}
 
-	if client.Store.DriverName() == model.DatabaseDriverMysql {
+	if src.DriverName() == model.DatabaseDriverMysql {
 		db.MapperFunc(func(s string) string { return s })
 	}
+
+	builder = builder.RunWith(db)
 
 	return &SQLStore{
 		db,
 		builder,
-		client.Log,
+		logger,
 	}, nil
 }
