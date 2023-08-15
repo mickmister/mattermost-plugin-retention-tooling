@@ -8,6 +8,7 @@ import (
 	"github.com/wiggin77/merror"
 
 	pluginapi "github.com/mattermost/mattermost-plugin-api"
+
 	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/store"
 )
 
