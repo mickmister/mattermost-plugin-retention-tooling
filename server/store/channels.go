@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -40,6 +41,9 @@ func (ss *SQLStore) GetStaleChannels(ageInDays int, offset int, batchSize int, e
 		// N+1 to check if there's a next page for pagination
 		query = query.Limit(uint64(batchSize) + 1)
 	}
+
+	sql, args, _ := query.ToSql()
+	fmt.Println(sql, " ::: ", args)
 
 	rows, err := query.Query()
 	if err != nil {
