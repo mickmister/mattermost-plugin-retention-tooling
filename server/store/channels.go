@@ -9,8 +9,14 @@ import (
 	"github.com/mattermost/mattermost-server/v6/model"
 )
 
+var (
+	defaultChannels = []string{"town-square", "off-topic"}
+)
+
 func (ss *SQLStore) GetStaleChannels(ageInDays int, offset int, batchSize int, excludeChannels []string) ([]*model.Channel, bool, error) {
 	olderThan := model.GetMillisForTime(time.Now().AddDate(0, 0, -ageInDays))
+
+	excludeChannels = append(excludeChannels, defaultChannels...)
 
 	// find all channels where no posts or reactions have been modified,deleted since the olderThan timestamp.
 	query := ss.builder.Select("ch.id", "ch.name").Distinct().
