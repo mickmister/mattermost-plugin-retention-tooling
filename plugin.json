@@ -5,8 +5,8 @@
     "homepage_url": "https://github.com/mattermost/mattermost-plugin-starter-template",
     "support_url": "https://github.com/mattermost/mattermost-plugin-starter-template/issues",
     "release_notes_url": "https://github.com/mattermost/mattermost-plugin-starter-template/releases/tag/v0.1.0",
-    "icon_path": "assets/starter-template-icon.svg",
-    "version": "0.1.0",
+    "icon_path": "assets/archiver.svg",
+    "version": "0.1.1",
     "min_server_version": "5.37.0",
     "server": {
         "executables": {

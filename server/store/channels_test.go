@@ -157,6 +157,50 @@ func TestSQLStore_GetStaleChannelsPagnation(t *testing.T) {
 	assert.ElementsMatch(t, staleIDs, channelIDs)
 }
 
+func TestSQLStore_GetStaleChannelsExclude(t *testing.T) {
+	th := SetupHelper(t).SetupBasic(t)
+	defer th.TearDown()
+
+	const channelCount = 20
+
+	channels, err := th.CreateChannels(channelCount, "exclude-channel-test", th.User1.Id, th.Team1.Id)
+	require.NoError(t, err)
+
+	// make first 5 stale
+	for i, ch := range channels {
+		if i < 5 {
+			setTimestamps(t, th, "channels", ch.Id, yearAgo, yearAgo, 0)
+		}
+	}
+
+	// exclude the first 3
+	exclude := []string{channels[0].Id, channels[1].Id, channels[2].Id}
+
+	staleChannels, more, err := th.Store.GetStaleChannels(30, 0, 0, exclude)
+	require.NoError(t, err)
+	assert.False(t, more)
+
+	assert.Len(t, staleChannels, 2)
+
+	staleIDs := extractChannelIDs(staleChannels)
+	assert.ElementsMatch(t, staleIDs, []string{channels[3].Id, channels[4].Id})
+}
+
+func TestSQLStore_GetStaleChannelsNone(t *testing.T) {
+	th := SetupHelper(t).SetupBasic(t)
+	defer th.TearDown()
+
+	const channelCount = 10
+
+	_, err := th.CreateChannels(channelCount, "no-results-test", th.User2.Id, th.Team2.Id)
+	require.NoError(t, err)
+
+	staleChannels, more, err := th.Store.GetStaleChannels(30, 0, 0, nil)
+	require.NoError(t, err)
+	assert.False(t, more)
+	assert.Empty(t, staleChannels)
+}
+
 func setTimestamps(t *testing.T, th *TestHelper, table string, channelID string, createAt, updateAt, deleteAt int64) {
 	query := th.Store.builder.Update(table)
 

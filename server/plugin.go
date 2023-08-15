@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	pluginapi "github.com/mattermost/mattermost-plugin-api"
-	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/store"
+	"github.com/mattermost/mattermost-server/v6/model"
 	"github.com/mattermost/mattermost-server/v6/plugin"
+
+	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/command"
+	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/store"
 )
 
 const (
@@ -30,6 +34,8 @@ type Plugin struct {
 
 	Client   *pluginapi.Client
 	SQLStore *store.SQLStore
+
+	channelArchiverCmd *command.ChannelArchiverCmd
 }
 
 func (p *Plugin) ServeHTTP(_ *plugin.Context, w http.ResponseWriter, r *http.Request) {
@@ -56,10 +62,37 @@ func (p *Plugin) OnActivate() error {
 	}
 	p.SQLStore = SQLStore
 
+	// Register slash command for channel archiver
+	p.channelArchiverCmd, err = command.RegisterChannelArchiver(p.Client, p.SQLStore)
+	if err != nil {
+		return fmt.Errorf("cannot register channel archiver slash command: %w", err)
+	}
+
 	return nil
 }
 
 func (p *Plugin) OnDeactivate() error {
-	// not implemented yet
 	return nil
+}
+
+func (p *Plugin) ExecuteCommand(_ *plugin.Context, args *model.CommandArgs) (*model.CommandResponse, *model.AppError) {
+	split := strings.Fields(args.Command)
+	cmd, _ := strings.CutPrefix(split[0], "/")
+
+	var response *model.CommandResponse
+	var err error
+
+	switch cmd {
+	case command.ArchiverTrigger:
+		response, err = p.channelArchiverCmd.Execute(args)
+	default:
+		err = fmt.Errorf("invalid command '%s'", cmd)
+	}
+
+	var appErr *model.AppError
+	if err != nil {
+		appErr = model.NewAppError("", "Error executing command '"+cmd+"'", nil, err.Error(), http.StatusInternalServerError)
+	}
+
+	return response, appErr
 }
