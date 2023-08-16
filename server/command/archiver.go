@@ -147,8 +147,14 @@ func (ca *ChannelArchiverCmd) handleArchive(args *model.CommandArgs, params map[
 		return responsef("%s\nCount: %d\n%s", sb.String(), len(results.ChannelsArchived), results.ExitReason), nil
 	}
 
-	return responsef("%d channels archived in %v.\n%d warnings\n%s\n%s",
-		len(results.ChannelsArchived), results.Duration, results.Warnings.Len(), results.Warnings.ErrorOrNil(), results.ExitReason), nil
+	var warnings strings.Builder
+	for _, e := range results.Warnings.Errors() {
+		warnings.WriteString(e.Error())
+		warnings.WriteString("\n")
+	}
+
+	return responsef("%d channels archived in %v.\n%d warnings\n%s%s",
+		len(results.ChannelsArchived), results.Duration, results.Warnings.Len(), warnings.String(), results.ExitReason), nil
 }
 
 func (ca *ChannelArchiverCmd) handleHelp() (*model.CommandResponse, error) {
