@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/wiggin77/merror"
-
 	pluginapi "github.com/mattermost/mattermost-plugin-api"
 
+	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/bot"
 	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/store"
 )
 
@@ -18,30 +17,30 @@ const (
 	ReasonDone      Reason = "completed normally"
 	ReasonCancelled Reason = "canceled"
 	ReasonError     Reason = "error"
-
-	sleepBetweenBatchesMillis = 100
 )
 
 type ArchiverOpts struct {
-	AgeInDays       int
-	BatchSize       int
-	ExcludeChannels []string // channels names or IDs
-	ListOnly        bool     // don't archive channels, just list results
+	StaleChannelOpts store.StaleChannelOpts
+
+	BatchSize   int
+	ListOnly    bool // don't archive channels, just list results
+	MaxWarnings int
+
+	ProgressFn func(results *ArchiverResults) // optional callback to receive results per batch
+	Bot        *bot.Bot                       // optional bot for posting channel archived notification posts
 }
 
 type ArchiverResults struct {
 	ChannelsArchived []string
 	ExitReason       Reason
 	Duration         time.Duration
-	Warnings         *merror.MError
 	start            time.Time
 }
 
-func ArchiveChannels(ctx context.Context, store *store.SQLStore, client *pluginapi.Client, opts ArchiverOpts) (results *ArchiverResults, retErr error) {
+func ArchiveStaleChannels(ctx context.Context, sqlstore *store.SQLStore, client *pluginapi.Client, opts ArchiverOpts) (results *ArchiverResults, retErr error) {
 	results = &ArchiverResults{
 		ChannelsArchived: make([]string, 0),
 		ExitReason:       ReasonDone,
-		Warnings:         merror.New(),
 		start:            time.Now(),
 	}
 
@@ -55,20 +54,66 @@ func ArchiveChannels(ctx context.Context, store *store.SQLStore, client *plugina
 		results.Duration = time.Since(results.start)
 	}()
 
-	return results, archiveChannels(ctx, store, client, opts, results)
+	if opts.ListOnly {
+		return results, listStaleChannels(ctx, sqlstore, opts, results)
+	}
+	return results, archiveStaleChannels(ctx, sqlstore, client, opts, results)
 }
 
-func archiveChannels(ctx context.Context, store *store.SQLStore, client *pluginapi.Client, opts ArchiverOpts, results *ArchiverResults) error {
-	page := 0
+func archiveStaleChannels(ctx context.Context, sqlstore *store.SQLStore, client *pluginapi.Client, opts ArchiverOpts, results *ArchiverResults) error {
+	// copy the StaleChannelOpts as we may modify it
+	staleChannelOpts := opts.StaleChannelOpts
+
 	for {
+		staleChannels, more, err := sqlstore.GetStaleChannels(staleChannelOpts, 0, opts.BatchSize)
+		if err != nil {
+			results.ExitReason = ReasonError
+			return fmt.Errorf("cannot fetch stale channels: %w", err)
+		}
+
+		for _, ch := range staleChannels {
+			// archive the channel after posting notice.
+			if opts.Bot != nil {
+				msg := fmt.Sprintf("This channel has been archived due to inactivity for more than %d days.", opts.StaleChannelOpts.AgeInDays)
+				_ = opts.Bot.SendPost(ch.Id, msg)
+			}
+			appErr := client.Channel.Delete(ch.Id)
+			if appErr != nil {
+				return fmt.Errorf("cannot archive channel %s (%s): %w", ch.Name, ch.Id, err)
+			}
+			results.ChannelsArchived = append(results.ChannelsArchived, fmt.Sprintf("%s (%s)", ch.Id, ch.Name))
+
+			// sleep a short time so we don't peg the cpu
+			select {
+			case <-time.After(time.Millisecond * 10):
+			case <-ctx.Done():
+				results.ExitReason = ReasonCancelled
+				return nil
+			}
+		}
+
+		if opts.ProgressFn != nil {
+			opts.ProgressFn(results)
+		}
+
+		if !more {
+			return nil
+		}
+
+		// sleep so we don't peg the cpu; longer here to allow websocket events to flush
 		select {
+		case <-time.After(time.Millisecond * 2000):
 		case <-ctx.Done():
 			results.ExitReason = ReasonCancelled
 			return nil
-		default:
 		}
+	}
+}
 
-		staleChannels, more, err := store.GetStaleChannels(opts.AgeInDays, page*opts.BatchSize, opts.BatchSize, opts.ExcludeChannels)
+func listStaleChannels(ctx context.Context, sqlstore *store.SQLStore, opts ArchiverOpts, results *ArchiverResults) error {
+	page := 0
+	for {
+		staleChannels, more, err := sqlstore.GetStaleChannels(opts.StaleChannelOpts, page, opts.BatchSize)
 		if err != nil {
 			results.ExitReason = ReasonError
 			return fmt.Errorf("cannot fetch stale channels: %w", err)
@@ -76,40 +121,19 @@ func archiveChannels(ctx context.Context, store *store.SQLStore, client *plugina
 		page++
 
 		for _, ch := range staleChannels {
-			if opts.ListOnly {
-				results.ChannelsArchived = append(results.ChannelsArchived, fmt.Sprintf("%s (%s)", ch.Id, ch.Name))
-				continue
-			}
-
-			// archive the channel; record errors but keep going.
-			appErr := client.Channel.Delete(ch.Id)
-			if appErr != nil {
-				results.Warnings.Append(fmt.Errorf("could not archive channel %s (%s): %w", ch.Id, ch.Name, appErr))
-				continue
-			}
-			results.ChannelsArchived = append(results.ChannelsArchived, fmt.Sprintf("%s (%s)", ch.Id, ch.Name))
-
-			// sleep a short time so we don't peg the cpu
-			select {
-			case <-time.After(time.Millisecond * sleepBetweenBatchesMillis):
-			case <-ctx.Done():
-				results.ExitReason = ReasonCancelled
-				return nil
-			}
+			results.ChannelsArchived = append(results.ChannelsArchived, fmt.Sprintf("**%s** (%s)", ch.Name, ch.Id))
 		}
 
 		if !more {
-			break
+			return nil
 		}
 
 		// sleep a short time so we don't peg the cpu
 		select {
-		case <-time.After(time.Millisecond * sleepBetweenBatchesMillis):
+		case <-time.After(time.Millisecond * 10):
 		case <-ctx.Done():
 			results.ExitReason = ReasonCancelled
 			return nil
 		}
 	}
-
-	return nil
 }

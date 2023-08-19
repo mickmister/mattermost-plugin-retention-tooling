@@ -3,7 +3,6 @@ package command
 import (
 	"context"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -12,16 +11,20 @@ import (
 	"github.com/mattermost/mattermost-plugin-api/experimental/command"
 	"github.com/mattermost/mattermost-server/v6/model"
 
+	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/bot"
 	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/channels"
 	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/store"
 )
 
 const (
-	ArchiverTrigger    = "channel-archiver"
-	paramNameDays      = "days"
-	paramNameBatchSize = "batch-size"
-	paramNameExclude   = "exclude"
-	defaultBatchSize   = 50
+	ArchiverTrigger         = "channel-archiver"
+	paramNameDays           = "days"
+	paramNameBatchSize      = "batch-size"
+	paramNameExclude        = "exclude"
+	defaultArchiveBatchSize = 100
+	defaultMaxWarnings      = 20
+	defaultListBatchSize    = 1000
+	minDays                 = 30
 )
 
 type ErrInvalidSubCommand struct {
@@ -36,6 +39,14 @@ type ChannelArchiverCmd struct {
 	client   *pluginapi.Client
 	sqlStore *store.SQLStore
 	commands []*model.AutocompleteData
+	bot      *bot.Bot
+}
+
+func getDefaultBatchSize(list bool) int {
+	if list {
+		return defaultListBatchSize
+	}
+	return defaultArchiveBatchSize
 }
 
 // RegisterChannelArchiver is called by the plugin to register all necessary commands
@@ -45,11 +56,11 @@ func RegisterChannelArchiver(client *pluginapi.Client, store *store.SQLStore) (*
 	cmdHelp := model.NewAutocompleteData("help", "", "Display help text")
 	commands := []*model.AutocompleteData{cmdArchive, cmdList, cmdHelp}
 
-	cmdArchive.AddNamedTextArgument(paramNameDays, "Number of days of inactivity for a channel to be considered stale", "[int]", "[0-9]*", true)
-	cmdArchive.AddNamedTextArgument(paramNameBatchSize, fmt.Sprintf("Channels will be archived in batches of this size. (default=%d)", defaultBatchSize), "[int]", "[0-9]*", false)
+	cmdArchive.AddNamedTextArgument(paramNameDays, "Number of days of inactivity for a channel to be considered stale", fmt.Sprintf("[int - min %d days]", minDays), "[0-9]*", true)
+	cmdArchive.AddNamedTextArgument(paramNameBatchSize, fmt.Sprintf("Channels will be archived in batches of this size. (default=%d)", defaultArchiveBatchSize), "[int]", "[0-9]*", false)
 	cmdArchive.AddNamedTextArgument(paramNameExclude, "Comma separated list of channel names/IDs to exclude. No Spaces.", "", "", false)
 
-	cmdList.AddNamedTextArgument(paramNameDays, "Number of days of inactivity for a channel to be considered stale", "[int]", "[0-9]*", true)
+	cmdList.AddNamedTextArgument(paramNameDays, "Number of days of inactivity for a channel to be considered stale", fmt.Sprintf("[int - min %d days]", minDays), "[0-9]*", true)
 	cmdList.AddNamedTextArgument(paramNameExclude, "Comma separated list of channel names/IDs to exclude. No Spaces.", "", "", false)
 
 	names := []string{}
@@ -64,6 +75,11 @@ func RegisterChannelArchiver(client *pluginapi.Client, store *store.SQLStore) (*
 	iconData, err := command.GetIconData(&client.System, "assets/archiver.svg")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get icon data")
+	}
+
+	bot, err := bot.New(client)
+	if err != nil {
+		return nil, err
 	}
 
 	err = client.SlashCommand.Register(&model.Command{
@@ -84,6 +100,7 @@ func RegisterChannelArchiver(client *pluginapi.Client, store *store.SQLStore) (*
 		client:   client,
 		sqlStore: store,
 		commands: commands,
+		bot:      bot,
 	}, nil
 }
 
@@ -91,33 +108,42 @@ func (ca *ChannelArchiverCmd) Execute(args *model.CommandArgs) (*model.CommandRe
 	params := parseNamedArgs(args.Command)
 	subCommand := params[SubCommandKey]
 
+	var err error
+	var msg string
+
 	switch subCommand {
 	case "archive":
-		return ca.handleArchive(args, params, false)
+		msg, err = ca.handleArchive(args, params, false)
 	case "list":
-		return ca.handleArchive(args, params, true)
+		msg, err = ca.handleArchive(args, params, true)
 	case "help":
-		return ca.handleHelp()
+		msg, err = ca.handleHelp()
 	default:
-		return nil, ErrInvalidSubCommand{subCommand: subCommand}
+		err = ErrInvalidSubCommand{subCommand: subCommand}
 	}
+
+	if msg != "" {
+		_ = ca.bot.SendEphemeralPost(args.ChannelId, args.UserId, msg)
+	}
+
+	return &model.CommandResponse{}, err
 }
 
-func (ca *ChannelArchiverCmd) handleArchive(args *model.CommandArgs, params map[string]string, list bool) (*model.CommandResponse, error) {
+func (ca *ChannelArchiverCmd) handleArchive(args *model.CommandArgs, params map[string]string, list bool) (string, error) {
 	if !ca.client.User.HasPermissionTo(args.UserId, model.PermissionManageSystem) {
-		return responsef("You require %s permissions to execute this command.", model.PermissionManageSystem.Id), nil
+		return fmt.Sprintf("You require %s permissions to execute this command.", model.PermissionManageSystem.Id), nil
 	}
 
-	days, err := parseInt(params[paramNameDays], 1, math.MaxInt)
+	days, err := parseInt(params[paramNameDays], minDays, 100000)
 	if err != nil {
-		return responsef("Missing or invalid '%s' parameter: %s", paramNameDays, err.Error()), nil
+		return fmt.Sprintf("Missing or invalid '%s' parameter: %s", paramNameDays, err.Error()), nil
 	}
 
-	batchSize := defaultBatchSize
+	batchSize := getDefaultBatchSize(list)
 	if bs, ok := params[paramNameBatchSize]; ok {
 		batchSize, err = parseInt(bs, 5, 10000)
 		if err != nil {
-			return responsef("Invalid '%s' parameter: %s", paramNameBatchSize, err.Error()), nil
+			return fmt.Sprintf("Invalid '%s' parameter: %s", paramNameBatchSize, err.Error()), nil
 		}
 	}
 
@@ -127,15 +153,27 @@ func (ca *ChannelArchiverCmd) handleArchive(args *model.CommandArgs, params map[
 	}
 
 	opts := channels.ArchiverOpts{
-		AgeInDays:       days,
-		BatchSize:       batchSize,
-		ExcludeChannels: exclude,
-		ListOnly:        list,
+		StaleChannelOpts: store.StaleChannelOpts{
+			AgeInDays:                 days,
+			ExcludeChannels:           exclude,
+			IncludeChannelTypeOpen:    true,
+			IncludeChannelTypePrivate: true,
+		},
+		BatchSize: batchSize,
+		ListOnly:  list,
+		ProgressFn: func(results *channels.ArchiverResults) {
+			if list {
+				return
+			}
+			ca.client.Log.Debug("Channel Archiver", "archived_count", len(results.ChannelsArchived))
+			msg := fmt.Sprintf("Channel-archiver progress -- %d channels archived.", len(results.ChannelsArchived))
+			_ = ca.bot.SendEphemeralPost(args.ChannelId, args.UserId, msg)
+		},
 	}
 
-	results, err := channels.ArchiveChannels(context.TODO(), ca.sqlStore, ca.client, opts)
+	results, err := channels.ArchiveStaleChannels(context.TODO(), ca.sqlStore, ca.client, opts)
 	if err != nil {
-		return responsef("Error archiving channels: %s", err.Error()), nil
+		return fmt.Sprintf("Error archiving channels: %s", err.Error()), nil
 	}
 
 	if list {
@@ -144,20 +182,15 @@ func (ca *ChannelArchiverCmd) handleArchive(args *model.CommandArgs, params map[
 			sb.WriteString(ch)
 			sb.WriteString("\n")
 		}
-		return responsef("%s\nCount: %d\n%s", sb.String(), len(results.ChannelsArchived), results.ExitReason), nil
+		msg := fmt.Sprintf("%s\ncount: %d\n%s", sb.String(), len(results.ChannelsArchived), results.ExitReason)
+		return msg, nil
 	}
 
-	var warnings strings.Builder
-	for _, e := range results.Warnings.Errors() {
-		warnings.WriteString(e.Error())
-		warnings.WriteString("\n")
-	}
-
-	return responsef("%d channels archived in %v.\n%d warnings\n%s%s",
-		len(results.ChannelsArchived), results.Duration, results.Warnings.Len(), warnings.String(), results.ExitReason), nil
+	return fmt.Sprintf("%d channels archived in %v.\n%s",
+		len(results.ChannelsArchived), results.Duration, results.ExitReason), nil
 }
 
-func (ca *ChannelArchiverCmd) handleHelp() (*model.CommandResponse, error) {
+func (ca *ChannelArchiverCmd) handleHelp() (string, error) {
 	resp := ""
 	for _, cmd := range ca.commands {
 		desc := cmd.Trigger
@@ -167,14 +200,5 @@ func (ca *ChannelArchiverCmd) handleHelp() (*model.CommandResponse, error) {
 		resp += fmt.Sprintf("/%s %s\n", ArchiverTrigger, desc)
 	}
 
-	return responsef(resp), nil
-}
-
-// responsef creates an ephemeral command response using printf syntax.
-func responsef(format string, args ...interface{}) *model.CommandResponse {
-	return &model.CommandResponse{
-		ResponseType: model.CommandResponseTypeEphemeral,
-		Text:         fmt.Sprintf(format, args...),
-		Type:         model.PostTypeDefault,
-	}
+	return resp, nil
 }
