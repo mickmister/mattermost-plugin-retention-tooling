@@ -74,7 +74,11 @@ func TestSQLStore_GetStaleChannels(t *testing.T) {
 	setTimestamps(t, th, "reactions", channels[9].Id, weekAgo, weekAgo, 0)
 
 	// fetch channels stale for 30 days or more
-	staleChannels, more, err := th.Store.GetStaleChannels(30, 0, 0, nil)
+	opts := StaleChannelOpts{
+		AgeInDays:              30,
+		IncludeChannelTypeOpen: true,
+	}
+	staleChannels, more, err := th.Store.GetStaleChannels(opts, 0, 0)
 	require.NoError(t, err)
 	assert.False(t, more)
 	assert.Len(t, staleChannels, 2)
@@ -104,7 +108,11 @@ func TestSQLStore_GetStaleChannelsEmptyChannel(t *testing.T) {
 	setTimestamps(t, th, "channels", channels[0].Id, yearAgo, yearAgo, 0)
 	setTimestamps(t, th, "channels", channels[2].Id, yearAgo, yearAgo, 0)
 
-	staleChannels, more, err := th.Store.GetStaleChannels(30, 0, 0, nil)
+	opts := StaleChannelOpts{
+		AgeInDays:              30,
+		IncludeChannelTypeOpen: true,
+	}
+	staleChannels, more, err := th.Store.GetStaleChannels(opts, 0, 0)
 	require.NoError(t, err)
 	assert.False(t, more)
 
@@ -135,9 +143,14 @@ func TestSQLStore_GetStaleChannelsPagnation(t *testing.T) {
 	staleChannels := make([]*model.Channel, 0)
 	loopCount := 0
 
+	opts := StaleChannelOpts{
+		AgeInDays:              30,
+		IncludeChannelTypeOpen: true,
+	}
+
 	// fetch channels stale for 30 days or more
 	for {
-		fetchedChannels, more, err := th.Store.GetStaleChannels(30, page*pageSize, pageSize, nil)
+		fetchedChannels, more, err := th.Store.GetStaleChannels(opts, page, pageSize)
 		require.NoError(t, err)
 		page++
 		loopCount++
@@ -176,7 +189,12 @@ func TestSQLStore_GetStaleChannelsExclude(t *testing.T) {
 	// exclude the first 3
 	exclude := []string{channels[0].Id, channels[1].Id, channels[2].Id}
 
-	staleChannels, more, err := th.Store.GetStaleChannels(30, 0, 0, exclude)
+	opts := StaleChannelOpts{
+		AgeInDays:              30,
+		IncludeChannelTypeOpen: true,
+		ExcludeChannels:        exclude,
+	}
+	staleChannels, more, err := th.Store.GetStaleChannels(opts, 0, 0)
 	require.NoError(t, err)
 	assert.False(t, more)
 
@@ -195,7 +213,11 @@ func TestSQLStore_GetStaleChannelsNone(t *testing.T) {
 	_, err := th.CreateChannels(channelCount, "no-results-test", th.User2.Id, th.Team2.Id)
 	require.NoError(t, err)
 
-	staleChannels, more, err := th.Store.GetStaleChannels(30, 0, 0, nil)
+	opts := StaleChannelOpts{
+		AgeInDays:              30,
+		IncludeChannelTypeOpen: true,
+	}
+	staleChannels, more, err := th.Store.GetStaleChannels(opts, 0, 0)
 	require.NoError(t, err)
 	assert.False(t, more)
 	assert.Empty(t, staleChannels)

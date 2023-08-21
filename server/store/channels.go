@@ -1,7 +1,6 @@
 package store
 
 import (
-	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -13,9 +12,20 @@ var (
 	defaultChannels = []string{"town-square", "off-topic"}
 )
 
-func (ss *SQLStore) GetStaleChannels(ageInDays int, offset int, batchSize int, excludeChannels []string) ([]*model.Channel, bool, error) {
-	olderThan := model.GetMillisForTime(time.Now().AddDate(0, 0, -ageInDays))
+type StaleChannelOpts struct {
+	AgeInDays                 int
+	ExcludeChannels           []string
+	IncludeChannelTypeOpen    bool
+	IncludeChannelTypePrivate bool
+	IncludeChannelTypeDirect  bool
+	IncludeChannelTypeGroup   bool
+}
 
+func (ss *SQLStore) GetStaleChannels(opts StaleChannelOpts, page int, pageSize int) ([]*model.Channel, bool, error) {
+	olderThan := model.GetMillisForTime(time.Now().AddDate(0, 0, -opts.AgeInDays))
+
+	excludeChannels := make([]string, 0)
+	excludeChannels = append(excludeChannels, opts.ExcludeChannels...)
 	excludeChannels = append(excludeChannels, defaultChannels...)
 
 	// find all channels where no posts or reactions have been modified,deleted since the olderThan timestamp.
@@ -33,17 +43,29 @@ func (ss *SQLStore) GetStaleChannels(ageInDays int, offset int, batchSize int, e
 		query = query.Where(sq.NotEq{"ch.id": excludeChannels, "ch.name": excludeChannels})
 	}
 
-	if offset > 0 {
-		query = query.Offset(uint64(offset))
+	channelTypes := []string{}
+	if opts.IncludeChannelTypeOpen {
+		channelTypes = append(channelTypes, string(model.ChannelTypeOpen))
+	}
+	if opts.IncludeChannelTypePrivate {
+		channelTypes = append(channelTypes, string(model.ChannelTypePrivate))
+	}
+	if opts.IncludeChannelTypeDirect {
+		channelTypes = append(channelTypes, string(model.ChannelTypeDirect))
+	}
+	if opts.IncludeChannelTypeGroup {
+		channelTypes = append(channelTypes, string(model.ChannelTypeGroup))
+	}
+	query = query.Where(sq.Eq{"ch.type": channelTypes})
+
+	if page > 0 {
+		query = query.Offset(uint64(page * pageSize))
 	}
 
-	if batchSize > 0 {
+	if pageSize > 0 {
 		// N+1 to check if there's a next page for pagination
-		query = query.Limit(uint64(batchSize) + 1)
+		query = query.Limit(uint64(pageSize) + 1)
 	}
-
-	sql, args, _ := query.ToSql()
-	fmt.Println(sql, " ::: ", args)
 
 	rows, err := query.Query()
 	if err != nil {
@@ -63,9 +85,9 @@ func (ss *SQLStore) GetStaleChannels(ageInDays int, offset int, batchSize int, e
 	}
 
 	var hasMore bool
-	if batchSize > 0 && len(channels) > batchSize {
+	if pageSize > 0 && len(channels) > pageSize {
 		hasMore = true
-		channels = channels[0:batchSize]
+		channels = channels[0:pageSize]
 	}
 
 	return channels, hasMore, nil
