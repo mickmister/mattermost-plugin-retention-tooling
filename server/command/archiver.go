@@ -177,8 +177,17 @@ func (ca *ChannelArchiverCmd) handleArchive(args *model.CommandArgs, params map[
 	}
 
 	if list {
+<<<<<<< HEAD
 		ca.reportChannelList(args, results.ChannelsArchived)
 		msg := fmt.Sprintf("count: %d\n%s", len(results.ChannelsArchived), results.ExitReason)
+=======
+		var sb strings.Builder
+		for _, ch := range results.ChannelsArchived {
+			sb.WriteString(ch)
+			sb.WriteString("\n")
+		}
+		msg := fmt.Sprintf("%s\ncount: %d\n%s", sb.String(), len(results.ChannelsArchived), results.ExitReason)
+>>>>>>> upstream/master
 		return msg, nil
 	}
 
@@ -197,6 +206,7 @@ func (ca *ChannelArchiverCmd) handleHelp() (string, error) {
 	}
 
 	return resp, nil
+<<<<<<< HEAD
 }
 
 func (ca *ChannelArchiverCmd) reportChannelList(args *model.CommandArgs, channelIDs []string) {
@@ -224,4 +234,6 @@ func (ca *ChannelArchiverCmd) reportChannelList(args *model.CommandArgs, channel
 		msg := fmt.Sprintf("Stale channels %d to %d of %d\n%s", start+1, idx, total, sb.String())
 		_ = ca.bot.SendEphemeralPost(args.ChannelId, args.UserId, msg)
 	}
+=======
+>>>>>>> upstream/master
 }
