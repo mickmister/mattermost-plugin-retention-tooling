@@ -3,6 +3,8 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -15,6 +17,7 @@ import (
 
 type TestHelper struct {
 	mainHelper *testlib.MainHelper
+	restoreEnv map[string]string
 
 	Store *SQLStore
 
@@ -26,13 +29,34 @@ type TestHelper struct {
 	User2    *model.User
 }
 
+func getServerPath(t *testing.T) string {
+	out, err := exec.Command("go", "list", "-m", "-f", "'{{.Dir}}'", "github.com/mattermost/mattermost-server/v6").Output()
+	require.NoError(t, err, "cannot get mod cache path for server package")
+	return strings.Trim(strings.TrimSpace(string(out)), "'")
+}
+
 func SetupHelper(t *testing.T) *TestHelper {
 	var options = testlib.HelperOptions{
 		EnableStore: true,
 	}
 
+	// testlib needs to access files in the server package, so here we set the
+	// MM_SERVER_PATH env var to point to the server package in mod cache.
+	restoreEnv := make(map[string]string)
+	serverPath := getServerPath(t)
+	if serverPath != "" {
+		oldPath := os.Getenv("MM_SERVER_PATH")
+		err := os.Setenv("MM_SERVER_PATH", serverPath)
+		require.NoError(t, err, "cannot set env MM_SERVER_PATH var")
+		restoreEnv["MM_SERVER_PATH"] = oldPath
+	}
+
+	fmt.Println("serverPath=", serverPath)
+	fmt.Println("MM_SERVER_PATH=", os.Getenv("MM_SERVER_PATH"))
+
 	th := &TestHelper{}
 	th.mainHelper = testlib.NewMainHelperWithOptions(&options)
+	th.restoreEnv = restoreEnv
 
 	dbStore := th.mainHelper.GetStore()
 	dbStore.DropAllTables()
@@ -74,6 +98,9 @@ func (th *TestHelper) TearDown() {
 	}
 	if th.mainHelper.Settings != nil {
 		storetest.CleanupSqlSettings(th.mainHelper.Settings)
+	}
+	for k, v := range th.restoreEnv {
+		_ = os.Setenv(k, v)
 	}
 }
 
