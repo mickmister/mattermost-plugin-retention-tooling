@@ -61,11 +61,8 @@ func ArchiveStaleChannels(ctx context.Context, sqlstore *store.SQLStore, client 
 }
 
 func archiveStaleChannels(ctx context.Context, sqlstore *store.SQLStore, client *pluginapi.Client, opts ArchiverOpts, results *ArchiverResults) error {
-	// copy the StaleChannelOpts as we may modify it
-	staleChannelOpts := opts.StaleChannelOpts
-
 	for {
-		staleChannels, more, err := sqlstore.GetStaleChannels(staleChannelOpts, 0, opts.BatchSize)
+		staleChannels, more, err := sqlstore.GetStaleChannels(opts.StaleChannelOpts, 0, opts.BatchSize)
 		if err != nil {
 			results.ExitReason = ReasonError
 			return fmt.Errorf("cannot fetch stale channels: %w", err)
