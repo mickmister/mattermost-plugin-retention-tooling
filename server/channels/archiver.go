@@ -7,8 +7,8 @@ import (
 
 	pluginapi "github.com/mattermost/mattermost-plugin-api"
 
-	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/bot"
-	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/store"
+	"github.com/mattermost/retention-tools/server/bot"
+	"github.com/mattermost/retention-tools/server/store"
 )
 
 type Reason string

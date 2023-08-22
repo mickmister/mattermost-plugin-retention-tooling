@@ -1,4 +1,4 @@
-module github.com/mattermost/mattermost-plugin-user-deactivation-cleanup
+module github.com/mattermost/retention-tools
 
 go 1.16
 

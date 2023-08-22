@@ -11,9 +11,9 @@ import (
 	"github.com/mattermost/mattermost-plugin-api/experimental/command"
 	"github.com/mattermost/mattermost-server/v6/model"
 
-	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/bot"
-	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/channels"
-	"github.com/mattermost/mattermost-plugin-user-deactivation-cleanup/server/store"
+	"github.com/mattermost/retention-tools/server/bot"
+	"github.com/mattermost/retention-tools/server/channels"
+	"github.com/mattermost/retention-tools/server/store"
 )
 
 const (
