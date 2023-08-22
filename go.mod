@@ -1,4 +1,4 @@
-module github.com/mattermost/retention-tools
+module github.com/mattermost/mattermost-plugin-retention-tooling
 
 go 1.16
 
