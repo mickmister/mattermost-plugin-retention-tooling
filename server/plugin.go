@@ -11,8 +11,8 @@ import (
 	"github.com/mattermost/mattermost-server/v6/model"
 	"github.com/mattermost/mattermost-server/v6/plugin"
 
-	"github.com/mattermost/retention-tools/server/command"
-	"github.com/mattermost/retention-tools/server/store"
+	"github.com/mattermost/mattermost-plugin-retention-tooling/server/command"
+	"github.com/mattermost/mattermost-plugin-retention-tooling/server/store"
 )
 
 const (
