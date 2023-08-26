@@ -20,6 +20,87 @@
     "settings_schema": {
         "header": "",
         "footer": "",
-        "settings": []
+        "settings": [
+            {
+                "key": "EnableChannelArchiver",
+                "display_name": "Enable Channel Archiver:",
+                "type": "bool",
+                "help_text": "When enabled the Channel Archiver will run periodically to archive stale channels.",
+                "placeholder": "",
+                "default": false
+            },{
+                "key": "AgeInDays",
+                "display_name": "Days of inactivity:",
+                "type": "number",
+                "help_text": "Number of days of inactivity for a channel to be considered stale (minimum 30).",
+                "default": 365
+            },
+            {
+                "key": "Frequency",
+                "display_name": "Frequency:",
+                "type": "dropdown",
+                "help_text": "Determines how often the Channel Archiver is run.",
+                "default": "monthly",
+                "options": [
+                    {
+                        "display_name": "Monthly", 
+                        "value": "monthly"
+                    },
+                    {
+                        "display_name": "Daily", 
+                        "value": "daily"
+                    },
+                    {
+                        "display_name": "Weekly - Monday", 
+                        "value": "monday"
+                    },
+                    {
+                        "display_name": "Weekly - Tuesday", 
+                        "value": "tuesday"
+                    },
+                    {
+                        "display_name": "Weekly - Wednesday", 
+                        "value": "wednesday"
+                    },
+                    {
+                        "display_name": "Weekly - Thursday", 
+                        "value": "thursday"
+                    },
+                    {
+                        "display_name": "Weekly - Friday", 
+                        "value": "friday"
+                    },
+                    {
+                        "display_name": "Weekly - Saturday", 
+                        "value": "saturday"
+                    },
+                    {
+                        "display_name": "Weekly - Sunday", 
+                        "value": "sunday"
+                    }                    
+                ]
+            },{
+                "key": "TimeOfDay",
+                "display_name": "Time of day:",
+                "type": "text",
+                "help_text": "Time of day to run the Channel Archiver in the form 'HH:MM Z' (e.g. '3:00am UTC').",
+                "default": "1:00am PST"
+            },            
+            {
+                "key": "ExcludeChannels",
+                "display_name": "Exclude channels:",
+                "type": "test",
+                "help_text": "Comma separated list of channel names or IDs that are excluded from auto-archiving.",
+                "placeholder": "",
+                "default": ""
+            },
+            {
+                "key": "BatchSize",
+                "display_name": "Batch size:",
+                "type": "number",
+                "help_text": "Channels will be archived in batches of this size to avoid stressing the server(s) or database(s).",
+                "default": 100
+            }            
+        ]
     }
 }
