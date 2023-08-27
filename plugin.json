@@ -51,35 +51,49 @@
                         "value": "daily"
                     },
                     {
-                        "display_name": "Weekly - Monday", 
-                        "value": "monday"
-                    },
-                    {
-                        "display_name": "Weekly - Tuesday", 
-                        "value": "tuesday"
-                    },
-                    {
-                        "display_name": "Weekly - Wednesday", 
-                        "value": "wednesday"
-                    },
-                    {
-                        "display_name": "Weekly - Thursday", 
-                        "value": "thursday"
-                    },
-                    {
-                        "display_name": "Weekly - Friday", 
-                        "value": "friday"
-                    },
-                    {
-                        "display_name": "Weekly - Saturday", 
-                        "value": "saturday"
-                    },
-                    {
-                        "display_name": "Weekly - Sunday", 
-                        "value": "sunday"
-                    }                    
+                        "display_name": "Weekly", 
+                        "value": "weekly"
+                    }
                 ]
-            },{
+            },
+            {
+                "key": "DayOfWeek",
+                "display_name": "Day of week:",
+                "type": "dropdown",
+                "help_text": "Determines what day of the week the Channel Archiver is run when Frequency is Monthly or Weekly.",
+                "default": "1",
+                "options": [
+                    {
+                        "display_name": "Sunday", 
+                        "value": "0"
+                    },
+                    {
+                        "display_name": "Monday", 
+                        "value": "1"
+                    },
+                    {
+                        "display_name": "Tuesday", 
+                        "value": "2"
+                    },
+                    {
+                        "display_name": "Wednesday", 
+                        "value": "3"
+                    },
+                    {
+                        "display_name": "Thursday", 
+                        "value": "4"
+                    },
+                    {
+                        "display_name": "Friday", 
+                        "value": "5"
+                    },
+                    {
+                        "display_name": "Saturday", 
+                        "value": "6"
+                    }                                        
+                ]
+            },            
+            {
                 "key": "TimeOfDay",
                 "display_name": "Time of day:",
                 "type": "text",

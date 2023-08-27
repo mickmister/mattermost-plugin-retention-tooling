@@ -131,14 +131,14 @@ func (ca *ChannelArchiverCmd) handleArchive(args *model.CommandArgs, params map[
 		return fmt.Sprintf("You require %s permissions to execute this command.", model.PermissionManageSystem.Id), nil
 	}
 
-	days, err := parseInt(params[paramNameDays], config.MinAgeInDays, config.MaxAgeInDays)
+	days, err := config.ParseInt(params[paramNameDays], config.MinAgeInDays, config.MaxAgeInDays)
 	if err != nil {
 		return fmt.Sprintf("Missing or invalid '%s' parameter: %s", paramNameDays, err.Error()), nil
 	}
 
 	batchSize := getDefaultBatchSize(list)
 	if bs, ok := params[paramNameBatchSize]; ok {
-		batchSize, err = parseInt(bs, config.MinBatchSize, config.MaxBatchSize)
+		batchSize, err = config.ParseInt(bs, config.MinBatchSize, config.MaxBatchSize)
 		if err != nil {
 			return fmt.Sprintf("Invalid '%s' parameter: %s", paramNameBatchSize, err.Error()), nil
 		}

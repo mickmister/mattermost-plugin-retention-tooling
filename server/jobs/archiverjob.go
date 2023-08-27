@@ -75,6 +75,8 @@ func (j *ChannelArchiverJob) start(settings *ChannelArchiverJobSettings) error {
 	}
 	j.job = job
 
+	j.client.Log.Debug("Channel Archiver started")
+
 	return nil
 }
 
@@ -105,6 +107,8 @@ func (j *ChannelArchiverJob) Stop(timeout time.Duration) error {
 		}
 	}
 
+	j.client.Log.Debug("Channel Archiver stopped", "err", merr.ErrorOrNil())
+
 	return merr.ErrorOrNil()
 }
 
@@ -124,8 +128,12 @@ func (j *ChannelArchiverJob) nextWaitInterval(now time.Time, metaData cluster.Jo
 		lastFinished = now
 	}
 
-	next := settings.Frequency.CalcNext(lastFinished, settings.TimeOfDay.UTC())
-	return next.Sub(now)
+	next := settings.Frequency.CalcNext(lastFinished, settings.DayOfWeek, settings.TimeOfDay.UTC())
+	delta := next.Sub(now)
+
+	j.client.Log.Debug("Channel Archiver next run scheduled", "next", next.Format(time.DateTime), "wait", delta.String())
+
+	return delta
 }
 
 func (j *ChannelArchiverJob) run() {

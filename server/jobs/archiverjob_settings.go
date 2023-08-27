@@ -12,6 +12,7 @@ type ChannelArchiverJobSettings struct {
 	EnableChannelArchiver bool
 	AgeInDays             int
 	Frequency             Frequency
+	DayOfWeek             int
 	TimeOfDay             time.Time
 	ExcludeChannels       []string
 	BatchSize             int
@@ -52,6 +53,11 @@ func parseChannelArchiverJobSettings(cfg *config.Configuration) (*ChannelArchive
 		return nil, err
 	}
 
+	dow, err := config.ParseInt(cfg.DayOfWeek, 0, 6)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse `Day of week`: %w", err)
+	}
+
 	tod, err := time.Parse("3:04pm MST", cfg.TimeOfDay)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse `Time of day`: %w", err)
@@ -75,6 +81,7 @@ func parseChannelArchiverJobSettings(cfg *config.Configuration) (*ChannelArchive
 		EnableChannelArchiver: cfg.EnableChannelArchiver,
 		AgeInDays:             cfg.AgeInDays,
 		Frequency:             freq,
+		DayOfWeek:             dow,
 		TimeOfDay:             tod,
 		ExcludeChannels:       excludes,
 	}, nil

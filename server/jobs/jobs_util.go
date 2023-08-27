@@ -8,15 +8,9 @@ import (
 )
 
 const (
-	Monthly   Frequency = "monthly"   // Run job monthly
-	Daily     Frequency = "daily"     // Run job daily
-	Monday    Frequency = "monday"    // Run job weekly on Mondays
-	Tuesday   Frequency = "tuesday"   // Run job weekly on Tuesdays
-	Wednesday Frequency = "wednesday" // Run job weekly on Wednesdays
-	Thursday  Frequency = "thursday"  // Run job weekly on Thursdays
-	Friday    Frequency = "friday"    // Run job weekly on Fridays
-	Saturday  Frequency = "saturday"  // Run job weekly on Saturdays
-	Sunday    Frequency = "sunday"    // Run job weekly on Sundays
+	Monthly Frequency = "monthly" // Run job monthly
+	Daily   Frequency = "daily"   // Run job daily
+	Weekly  Frequency = "weekly"  // Run job weekly
 )
 
 var (
@@ -43,28 +37,38 @@ func FreqFromString(s string) (Frequency, error) {
 	switch strings.ToLower(s) {
 	case string(Monthly):
 		return Monthly, nil
-	case string(Daily):
-		return Daily, nil
-	case string(Monday):
-		return Monday, nil
-	case string(Tuesday):
-		return Tuesday, nil
-	case string(Wednesday):
-		return Wednesday, nil
-	case string(Thursday):
-		return Thursday, nil
-	case string(Friday):
-		return Friday, nil
-	case string(Saturday):
-		return Saturday, nil
-	case string(Sunday):
-		return Sunday, nil
+	case string(Weekly):
+		return Weekly, nil
 	default:
 		return "", errors.Wrapf(ErrInvalidFrequency, "'%s' is not a valid frequency", s)
 	}
 }
 
 // CalcNext determines the next time based on a starting time, this frequency, and the time of day option.
-func (f Frequency) CalcNext(now time.Time, timeOfDay time.Time) time.Time {
+func (f Frequency) CalcNext(last time.Time, dayOfWeek int, timeOfDay time.Time) time.Time {
+	var next time.Time
+	var dowAdjust bool
 
+	switch f {
+	case Monthly:
+		next = time.Date(last.Year(), last.Month()+1, last.Day(), timeOfDay.Hour(), timeOfDay.Minute(), timeOfDay.Second(), 0, timeOfDay.Location())
+		dowAdjust = true
+	case Weekly:
+		next = time.Date(last.Year(), last.Month(), last.Day()+7, timeOfDay.Hour(), timeOfDay.Minute(), timeOfDay.Second(), 0, timeOfDay.Location())
+		dowAdjust = true
+	case Daily:
+		next = time.Date(last.Year(), last.Month(), last.Day()+1, timeOfDay.Hour(), timeOfDay.Minute(), timeOfDay.Second(), 0, timeOfDay.Location())
+	}
+
+	// adjust for day of week.
+	if dowAdjust {
+		nextWeekday := int(next.Weekday())
+		if nextWeekday <= dayOfWeek {
+			next = next.AddDate(0, 0, dayOfWeek-nextWeekday)
+		} else {
+			next = next.AddDate(0, 0, (dayOfWeek+7)-nextWeekday)
+		}
+	}
+
+	return next
 }

@@ -2,6 +2,8 @@ package config
 
 import (
 	"errors"
+	"fmt"
+	"strconv"
 )
 
 const (
@@ -34,6 +36,7 @@ type Configuration struct {
 	EnableChannelArchiver bool
 	AgeInDays             int
 	Frequency             string
+	DayOfWeek             string
 	TimeOfDay             string
 	ExcludeChannels       string
 	BatchSize             int
@@ -51,4 +54,21 @@ func NewConfiguration() *Configuration {
 func (c *Configuration) Clone() *Configuration {
 	var clone = *c
 	return &clone
+}
+
+func ParseInt(s string, min int, max int) (int, error) {
+	i64, err := strconv.ParseInt(s, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	i := int(i64)
+
+	if i < min {
+		return 0, fmt.Errorf("number must be greater than or equal to %d", min)
+	}
+
+	if i > max {
+		return 0, fmt.Errorf("number must be less than or equal to %d", max)
+	}
+	return i, nil
 }
