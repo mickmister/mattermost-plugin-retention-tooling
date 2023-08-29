@@ -39,6 +39,8 @@ func FreqFromString(s string) (Frequency, error) {
 		return Monthly, nil
 	case string(Weekly):
 		return Weekly, nil
+	case string(Daily):
+		return Daily, nil
 	default:
 		return "", errors.Wrapf(ErrInvalidFrequency, "'%s' is not a valid frequency", s)
 	}
@@ -46,6 +48,10 @@ func FreqFromString(s string) (Frequency, error) {
 
 // CalcNext determines the next time based on a starting time, this frequency, and the time of day option.
 func (f Frequency) CalcNext(last time.Time, dayOfWeek int, timeOfDay time.Time) time.Time {
+	// everything in UTC
+	originalLocation := timeOfDay.Location()
+	last = last.In(originalLocation)
+
 	var next time.Time
 	var dowAdjust bool
 
@@ -70,5 +76,5 @@ func (f Frequency) CalcNext(last time.Time, dayOfWeek int, timeOfDay time.Time) 
 		}
 	}
 
-	return next
+	return next.In(originalLocation)
 }

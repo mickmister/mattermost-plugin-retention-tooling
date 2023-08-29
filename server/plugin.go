@@ -84,6 +84,7 @@ func (p *Plugin) OnActivate() error {
 	if err := p.jobManager.AddJob(channelArchiverJob); err != nil {
 		return fmt.Errorf("cannot add channel archiver job: %w", err)
 	}
+	_ = p.jobManager.OnConfigurationChange(p.getConfiguration())
 
 	return nil
 }

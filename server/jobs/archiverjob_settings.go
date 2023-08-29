@@ -8,6 +8,11 @@ import (
 	"github.com/mattermost/mattermost-plugin-retention-tooling/server/config"
 )
 
+const (
+	FullLayout      = "Jan 2, 2006 3:04pm -0700"
+	TimeOfDayLayout = "3:04pm -0700"
+)
+
 type ChannelArchiverJobSettings struct {
 	EnableChannelArchiver bool
 	AgeInDays             int
@@ -34,7 +39,7 @@ func (c *ChannelArchiverJobSettings) Clone() *ChannelArchiverJobSettings {
 
 func (c *ChannelArchiverJobSettings) String() string {
 	return fmt.Sprintf("enabled=%T; ageDays=%d; freq=%s; tod=%s; batchSize=%d; excludeLen=%d",
-		c.EnableChannelArchiver, c.AgeInDays, c.Frequency, c.TimeOfDay.Format("3:04pm MST"), c.BatchSize, len(c.ExcludeChannels))
+		c.EnableChannelArchiver, c.AgeInDays, c.Frequency, c.TimeOfDay.Format(TimeOfDayLayout), c.BatchSize, len(c.ExcludeChannels))
 }
 
 func parseChannelArchiverJobSettings(cfg *config.Configuration) (*ChannelArchiverJobSettings, error) {
@@ -58,7 +63,7 @@ func parseChannelArchiverJobSettings(cfg *config.Configuration) (*ChannelArchive
 		return nil, fmt.Errorf("cannot parse `Day of week`: %w", err)
 	}
 
-	tod, err := time.Parse("3:04pm MST", cfg.TimeOfDay)
+	tod, err := time.Parse(TimeOfDayLayout, cfg.TimeOfDay)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse `Time of day`: %w", err)
 	}
