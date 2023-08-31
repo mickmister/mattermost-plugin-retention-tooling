@@ -1,4 +1,4 @@
-# Mattermost Rentention Tooling plugin ![CI](https://github.com/mickmister/mattermost-plugin-retention-tooling/actions/ci.yml/badge.svg)
+# Mattermost Rentention Tooling plugin ![CI](https://github.com/mickmister/mattermost-plugin-retention-tooling/actions/workflows/ci.yml/badge.svg)
 
 This plugin provides data rentention tools to augment the [data retention capabilities](https://docs.mattermost.com/comply/data-retention-policy.html) of Mattermost Enterprise Edition.
 
