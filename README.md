@@ -1,4 +1,4 @@
-# Mattermost Rentention Tooling plugin [![CircleCI branch](https://img.shields.io/circleci/project/github/mickmister/mattermost-plugin-retention-tooling/master.svg)](https://circleci.com/gh/mattermost/mattermost-plugin-starter-template)
+# Mattermost Rentention Tooling plugin ![CI](https://github.com/mickmister/mattermost-plugin-retention-tooling/actions/ci.yml/badge.svg)
 
 This plugin provides data rentention tools to augment the [data retention capabilities](https://docs.mattermost.com/comply/data-retention-policy.html) of Mattermost Enterprise Edition.
 
