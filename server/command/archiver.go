@@ -13,18 +13,15 @@ import (
 
 	"github.com/mattermost/mattermost-plugin-retention-tooling/server/bot"
 	"github.com/mattermost/mattermost-plugin-retention-tooling/server/channels"
+	"github.com/mattermost/mattermost-plugin-retention-tooling/server/config"
 	"github.com/mattermost/mattermost-plugin-retention-tooling/server/store"
 )
 
 const (
-	ArchiverTrigger         = "channel-archiver"
-	paramNameDays           = "days"
-	paramNameBatchSize      = "batch-size"
-	paramNameExclude        = "exclude"
-	defaultArchiveBatchSize = 100
-	defaultMaxWarnings      = 20
-	defaultListBatchSize    = 1000
-	minDays                 = 30
+	ArchiverTrigger    = "channel-archiver"
+	paramNameDays      = "days"
+	paramNameBatchSize = "batch-size"
+	paramNameExclude   = "exclude"
 )
 
 type ErrInvalidSubCommand struct {
@@ -44,9 +41,9 @@ type ChannelArchiverCmd struct {
 
 func getDefaultBatchSize(list bool) int {
 	if list {
-		return defaultListBatchSize
+		return config.DefaultListBatchSize
 	}
-	return defaultArchiveBatchSize
+	return config.DefaultArchiveBatchSize
 }
 
 // RegisterChannelArchiver is called by the plugin to register all necessary commands
@@ -56,11 +53,11 @@ func RegisterChannelArchiver(client *pluginapi.Client, store *store.SQLStore) (*
 	cmdHelp := model.NewAutocompleteData("help", "", "Display help text")
 	commands := []*model.AutocompleteData{cmdArchive, cmdList, cmdHelp}
 
-	cmdArchive.AddNamedTextArgument(paramNameDays, "Number of days of inactivity for a channel to be considered stale", fmt.Sprintf("[int - min %d days]", minDays), "[0-9]*", true)
-	cmdArchive.AddNamedTextArgument(paramNameBatchSize, fmt.Sprintf("Channels will be archived in batches of this size. (default=%d)", defaultArchiveBatchSize), "[int]", "[0-9]*", false)
+	cmdArchive.AddNamedTextArgument(paramNameDays, "Number of days of inactivity for a channel to be considered stale", fmt.Sprintf("[int - min %d days]", config.MinAgeInDays), "[0-9]*", true)
+	cmdArchive.AddNamedTextArgument(paramNameBatchSize, fmt.Sprintf("Channels will be archived in batches of this size. (default=%d)", config.DefaultArchiveBatchSize), "[int]", "[0-9]*", false)
 	cmdArchive.AddNamedTextArgument(paramNameExclude, "Comma separated list of channel names/IDs to exclude. No Spaces.", "", "", false)
 
-	cmdList.AddNamedTextArgument(paramNameDays, "Number of days of inactivity for a channel to be considered stale", fmt.Sprintf("[int - min %d days]", minDays), "[0-9]*", true)
+	cmdList.AddNamedTextArgument(paramNameDays, "Number of days of inactivity for a channel to be considered stale", fmt.Sprintf("[int - min %d days]", config.MinAgeInDays), "[0-9]*", true)
 	cmdList.AddNamedTextArgument(paramNameExclude, "Comma separated list of channel names/IDs to exclude. No Spaces.", "", "", false)
 
 	names := []string{}
@@ -134,14 +131,14 @@ func (ca *ChannelArchiverCmd) handleArchive(args *model.CommandArgs, params map[
 		return fmt.Sprintf("You require %s permissions to execute this command.", model.PermissionManageSystem.Id), nil
 	}
 
-	days, err := parseInt(params[paramNameDays], minDays, 100000)
+	days, err := config.ParseInt(params[paramNameDays], config.MinAgeInDays, config.MaxAgeInDays)
 	if err != nil {
 		return fmt.Sprintf("Missing or invalid '%s' parameter: %s", paramNameDays, err.Error()), nil
 	}
 
 	batchSize := getDefaultBatchSize(list)
 	if bs, ok := params[paramNameBatchSize]; ok {
-		batchSize, err = parseInt(bs, 5, 10000)
+		batchSize, err = config.ParseInt(bs, config.MinBatchSize, config.MaxBatchSize)
 		if err != nil {
 			return fmt.Sprintf("Invalid '%s' parameter: %s", paramNameBatchSize, err.Error()), nil
 		}

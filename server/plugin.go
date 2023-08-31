@@ -6,17 +6,21 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	pluginapi "github.com/mattermost/mattermost-plugin-api"
 	"github.com/mattermost/mattermost-server/v6/model"
 	"github.com/mattermost/mattermost-server/v6/plugin"
 
 	"github.com/mattermost/mattermost-plugin-retention-tooling/server/command"
+	"github.com/mattermost/mattermost-plugin-retention-tooling/server/config"
+	"github.com/mattermost/mattermost-plugin-retention-tooling/server/jobs"
 	"github.com/mattermost/mattermost-plugin-retention-tooling/server/store"
 )
 
 const (
 	routeRemoveUserFromAllTeamsAndChannels = "/remove_user_from_all_teams_and_channels"
+	ChannelArchiverJobID                   = "channel_archiver_job"
 )
 
 type ErrorResponse struct {
@@ -30,12 +34,13 @@ type SuccessResponse struct {
 type Plugin struct {
 	plugin.MattermostPlugin
 	configurationLock sync.RWMutex
-	configuration     *configuration
+	configuration     *config.Configuration
 
 	Client   *pluginapi.Client
 	SQLStore *store.SQLStore
 
 	channelArchiverCmd *command.ChannelArchiverCmd
+	jobManager         *jobs.JobManager
 }
 
 func (p *Plugin) ServeHTTP(_ *plugin.Context, w http.ResponseWriter, r *http.Request) {
@@ -68,10 +73,28 @@ func (p *Plugin) OnActivate() error {
 		return fmt.Errorf("cannot register channel archiver slash command: %w", err)
 	}
 
+	// Create job manager
+	p.jobManager = jobs.NewJobManager(&p.Client.Log)
+
+	// Create job for channel archiver
+	channelArchiverJob, err := jobs.NewChannelArchiverJob(ChannelArchiverJobID, p.API, p.Client, SQLStore)
+	if err != nil {
+		return fmt.Errorf("cannot create channel archiver job: %w", err)
+	}
+	if err := p.jobManager.AddJob(channelArchiverJob); err != nil {
+		return fmt.Errorf("cannot add channel archiver job: %w", err)
+	}
+	_ = p.jobManager.OnConfigurationChange(p.getConfiguration())
+
 	return nil
 }
 
 func (p *Plugin) OnDeactivate() error {
+	if p.jobManager != nil {
+		if err := p.jobManager.Close(time.Second * 15); err != nil {
+			return fmt.Errorf("error closing job manager: %w", err)
+		}
+	}
 	return nil
 }
 
